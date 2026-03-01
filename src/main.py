@@ -12,6 +12,7 @@ from src.constants import POLL_INTERVAL_SECONDS
 from src.dashboard import DashboardWindow
 from src.db import UsageDB
 from src.local_stats import load_local_stats
+from src.notifications import NotificationManager, THRESHOLD_CYCLE
 from src.tray import TrayManager
 
 
@@ -37,6 +38,9 @@ class App:
         self._db = UsageDB()
         self._running = True
 
+        # Notifications
+        self._notifications = NotificationManager()
+
         # Dashboard
         self._dashboard = DashboardWindow()
         self._dashboard.set_refresh_callback(self._on_refresh)
@@ -59,18 +63,26 @@ class App:
             self._chart.set_data(stats.daily_activity)
             self._insights.set_stats(stats)
 
-        # Tray (QSystemTrayIcon — runs in Qt event loop, no separate thread)
+        # Tray (QSystemTrayIcon -- runs in Qt event loop, no separate thread)
         self._tray = TrayManager(
             on_open_dashboard=self._on_open_dashboard,
             on_refresh=self._on_refresh,
             on_quit=self._on_quit,
+            on_cycle_threshold=self._on_cycle_threshold,
+            on_toggle_reset_alerts=self._on_toggle_reset_alerts,
+        )
+
+        # Sync tray with persisted notification settings
+        self._tray.update_settings(
+            self._notifications.threshold,
+            self._notifications.reset_notifications,
         )
 
         # Signal connections
         self._signals.usage_updated.connect(self._handle_usage_update)
         self._signals.usage_error.connect(self._handle_usage_error)
 
-        # Status label timer — update "X seconds ago" every 10s
+        # Status label timer -- update "X seconds ago" every 10s
         self._last_data: UsageData | None = None
         self._status_timer = QTimer()
         self._status_timer.timeout.connect(self._refresh_status_time)
@@ -105,6 +117,7 @@ class App:
         self._last_data = data
         self._tray.update(data, None)
         self._dashboard.update_usage(data)
+        self._notifications.check(data)
 
     def _handle_usage_error(self, error: str) -> None:
         self._tray.update(None, error)
@@ -128,6 +141,28 @@ class App:
         self._db.prune_old()
         self._db.close()
         self._qt_app.quit()
+
+    def _on_cycle_threshold(self, *_args) -> None:
+        current = self._notifications.threshold
+        # Find the next threshold in the cycle
+        try:
+            idx = THRESHOLD_CYCLE.index(current)
+            next_val = THRESHOLD_CYCLE[(idx + 1) % len(THRESHOLD_CYCLE)]
+        except ValueError:
+            next_val = THRESHOLD_CYCLE[0]
+        self._notifications.update_threshold(next_val)
+        self._tray.update_settings(
+            self._notifications.threshold,
+            self._notifications.reset_notifications,
+        )
+
+    def _on_toggle_reset_alerts(self, *_args) -> None:
+        new_state = not self._notifications.reset_notifications
+        self._notifications.set_reset_notifications(new_state)
+        self._tray.update_settings(
+            self._notifications.threshold,
+            self._notifications.reset_notifications,
+        )
 
     def run(self) -> None:
         # Show tray icon

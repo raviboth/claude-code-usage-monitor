@@ -15,6 +15,9 @@ from src.constants import (
 # Linux icons are typically 24px
 _RENDER_SIZE = 44 if sys.platform == "darwin" else 48
 
+# Dark background color for the inner circle of the ring
+_BG_COLOR = "#1a1a1a"
+
 
 def _color_for_utilization(utilization: float | None) -> str:
     if utilization is None:
@@ -36,16 +39,29 @@ def _label_for_utilization(utilization: float | None) -> str:
 
 
 def render_tray_icon(utilization: float | None) -> Image.Image:
-    """Render a tray icon showing the usage percentage on a colored circle.
+    """Render a tray icon showing the usage percentage inside a colored ring.
 
-    Returns an image at 2x resolution for Retina support (44x44 on macOS).
+    Draws a colored annulus (green/yellow/red) with a dark interior and
+    white text centered inside. Returns an image at 2x resolution for
+    Retina support (44x44 on macOS).
     """
     size = _RENDER_SIZE
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     color = _color_for_utilization(utilization)
+
+    # Draw outer colored circle (the ring)
     draw.ellipse([1, 1, size - 2, size - 2], fill=color)
+
+    # Draw inner dark circle to create the ring/annulus effect
+    # Ring thickness is ~16% of icon size
+    ring_thickness = round(size * 0.16)
+    inset = 1 + ring_thickness
+    draw.ellipse(
+        [inset, inset, size - 1 - ring_thickness, size - 1 - ring_thickness],
+        fill=_BG_COLOR,
+    )
 
     label = _label_for_utilization(utilization)
 

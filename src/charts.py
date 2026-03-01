@@ -52,6 +52,9 @@ class ActivityChart(QWidget):
         self._plot.setFixedHeight(180)
         self._plot.showGrid(y=True, alpha=0.3)
         self._plot.getAxis("bottom").setStyle(showValues=False)
+        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.enableAutoRange()
+        self._plot.hideButtons()
         layout.addWidget(self._plot)
 
         # Metric selector + total
@@ -95,6 +98,7 @@ class ActivityChart(QWidget):
         x = list(range(len(values)))
         bar = pg.BarGraphItem(x=x, height=values, width=0.6, brush="#4CAF50")
         self._plot.addItem(bar)
+        self._plot.enableAutoRange()
 
         total = sum(values)
         self._total_label.setText(f"Total: {total:,}")
