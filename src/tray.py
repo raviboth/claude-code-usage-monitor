@@ -69,11 +69,6 @@ class TrayManager:
         self._menu = QMenu()
         self._build_menu()
         self._tray.setContextMenu(self._menu)
-        self._tray.activated.connect(self._on_activated)
-
-    def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            self._on_open_dashboard()
 
     def _build_menu(self) -> None:
         self._menu.clear()
