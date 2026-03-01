@@ -54,21 +54,13 @@ class TrayManager:
         on_open_dashboard: callable,
         on_refresh: callable,
         on_quit: callable,
-        on_cycle_threshold: callable | None = None,
-        on_toggle_reset_alerts: callable | None = None,
     ) -> None:
         self._on_open_dashboard = on_open_dashboard
         self._on_refresh = on_refresh
         self._on_quit = on_quit
-        self._on_cycle_threshold = on_cycle_threshold
-        self._on_toggle_reset_alerts = on_toggle_reset_alerts
         self._last_data: UsageData | None = None
         self._error: str | None = None
         self._stale = False
-
-        # Settings display state
-        self._threshold: float = 0.70
-        self._reset_enabled: bool = False
 
         icon_image = render_tray_icon(None)
         self._tray = QSystemTrayIcon(_pil_to_qicon(icon_image))
@@ -77,11 +69,6 @@ class TrayManager:
         self._menu = QMenu()
         self._build_menu()
         self._tray.setContextMenu(self._menu)
-
-    def update_settings(self, threshold: float, reset_enabled: bool) -> None:
-        self._threshold = threshold
-        self._reset_enabled = reset_enabled
-        self._build_menu()
 
     def _build_menu(self) -> None:
         self._menu.clear()
@@ -117,20 +104,6 @@ class TrayManager:
         self._menu.addSeparator()
         self._menu.addAction("Open Dashboard", self._on_open_dashboard)
         self._menu.addAction("Refresh Now", self._on_refresh)
-
-        # --- Settings section ---
-        self._menu.addSeparator()
-
-        threshold_pct = int(self._threshold * 100)
-        threshold_action = self._menu.addAction(f"Alert at: {threshold_pct}%")
-        if self._on_cycle_threshold:
-            threshold_action.triggered.connect(self._on_cycle_threshold)
-
-        reset_label = "Reset alerts: On" if self._reset_enabled else "Reset alerts: Off"
-        reset_action = self._menu.addAction(reset_label)
-        if self._on_toggle_reset_alerts:
-            reset_action.triggered.connect(self._on_toggle_reset_alerts)
-
         self._menu.addSeparator()
         self._menu.addAction("Quit", self._on_quit)
 

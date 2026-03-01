@@ -3,11 +3,13 @@ from datetime import datetime, timezone
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -167,6 +169,29 @@ class DashboardWindow(QWidget):
         status_row.addWidget(self._refresh_btn)
         self._layout.addLayout(status_row)
 
+        # Alerts settings
+        alerts_header = QLabel("Alerts")
+        alerts_header.setStyleSheet("font-size: 14px; font-weight: bold; margin-top: 12px;")
+        self._layout.addWidget(alerts_header)
+
+        threshold_row = QHBoxLayout()
+        threshold_label = QLabel("5h usage alert at:")
+        threshold_label.setStyleSheet("font-size: 12px;")
+        threshold_row.addWidget(threshold_label)
+
+        self._threshold_spin = QSpinBox()
+        self._threshold_spin.setRange(10, 100)
+        self._threshold_spin.setSuffix("%")
+        self._threshold_spin.setValue(70)
+        self._threshold_spin.setFixedWidth(75)
+        threshold_row.addWidget(self._threshold_spin)
+        threshold_row.addStretch()
+        self._layout.addLayout(threshold_row)
+
+        self._reset_check = QCheckBox("Notify when usage window resets")
+        self._reset_check.setStyleSheet("font-size: 12px; margin-top: 4px; margin-bottom: 8px;")
+        self._layout.addWidget(self._reset_check)
+
         # Placeholder for charts (added later)
         self._chart_placeholder = QWidget()
         self._layout.addWidget(self._chart_placeholder)
@@ -185,6 +210,21 @@ class DashboardWindow(QWidget):
 
     def set_refresh_callback(self, callback: callable) -> None:
         self._refresh_btn.clicked.connect(callback)
+
+    def set_threshold_callback(self, callback: callable) -> None:
+        self._threshold_spin.valueChanged.connect(callback)
+
+    def set_reset_alerts_callback(self, callback: callable) -> None:
+        self._reset_check.stateChanged.connect(callback)
+
+    def update_alert_settings(self, threshold: float, reset_enabled: bool) -> None:
+        self._threshold_spin.blockSignals(True)
+        self._threshold_spin.setValue(int(threshold * 100))
+        self._threshold_spin.blockSignals(False)
+
+        self._reset_check.blockSignals(True)
+        self._reset_check.setChecked(reset_enabled)
+        self._reset_check.blockSignals(False)
 
     def update_usage(self, data: UsageData) -> None:
         self._five_hour_bar.update_data(data.five_hour)

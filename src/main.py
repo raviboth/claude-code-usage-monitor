@@ -12,7 +12,7 @@ from src.constants import POLL_INTERVAL_SECONDS
 from src.dashboard import DashboardWindow
 from src.db import UsageDB
 from src.local_stats import load_local_stats
-from src.notifications import NotificationManager, THRESHOLD_CYCLE
+from src.notifications import NotificationManager
 from src.tray import TrayManager
 
 
@@ -44,6 +44,12 @@ class App:
         # Dashboard
         self._dashboard = DashboardWindow()
         self._dashboard.set_refresh_callback(self._on_refresh)
+        self._dashboard.set_threshold_callback(self._on_threshold_changed)
+        self._dashboard.set_reset_alerts_callback(self._on_reset_alerts_changed)
+        self._dashboard.update_alert_settings(
+            self._notifications.threshold,
+            self._notifications.reset_notifications,
+        )
 
         # Charts + insights
         self._chart = ActivityChart()
@@ -68,14 +74,6 @@ class App:
             on_open_dashboard=self._on_open_dashboard,
             on_refresh=self._on_refresh,
             on_quit=self._on_quit,
-            on_cycle_threshold=self._on_cycle_threshold,
-            on_toggle_reset_alerts=self._on_toggle_reset_alerts,
-        )
-
-        # Sync tray with persisted notification settings
-        self._tray.update_settings(
-            self._notifications.threshold,
-            self._notifications.reset_notifications,
         )
 
         # Signal connections
@@ -142,27 +140,11 @@ class App:
         self._db.close()
         self._qt_app.quit()
 
-    def _on_cycle_threshold(self, *_args) -> None:
-        current = self._notifications.threshold
-        # Find the next threshold in the cycle
-        try:
-            idx = THRESHOLD_CYCLE.index(current)
-            next_val = THRESHOLD_CYCLE[(idx + 1) % len(THRESHOLD_CYCLE)]
-        except ValueError:
-            next_val = THRESHOLD_CYCLE[0]
-        self._notifications.update_threshold(next_val)
-        self._tray.update_settings(
-            self._notifications.threshold,
-            self._notifications.reset_notifications,
-        )
+    def _on_threshold_changed(self, value: int) -> None:
+        self._notifications.update_threshold(value / 100.0)
 
-    def _on_toggle_reset_alerts(self, *_args) -> None:
-        new_state = not self._notifications.reset_notifications
-        self._notifications.set_reset_notifications(new_state)
-        self._tray.update_settings(
-            self._notifications.threshold,
-            self._notifications.reset_notifications,
-        )
+    def _on_reset_alerts_changed(self, state: int) -> None:
+        self._notifications.set_reset_notifications(state != 0)
 
     def run(self) -> None:
         # Show tray icon
