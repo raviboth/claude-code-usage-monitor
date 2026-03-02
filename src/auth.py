@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 from src.constants import KEYCHAIN_SERVICE_NAME
 
@@ -53,6 +54,15 @@ def _get_token_macos() -> AuthResult:
 
 
 def _get_token_linux() -> AuthResult:
+    # Claude Code on Linux stores credentials directly in ~/.claude/.credentials.json
+    credentials_file = Path.home() / ".claude" / ".credentials.json"
+    if credentials_file.exists():
+        try:
+            return _parse_credential_json(credentials_file.read_text())
+        except OSError:
+            pass
+
+    # Fall back to secret-tool (libsecret) for systems that use the keychain
     try:
         result = subprocess.run(
             [
@@ -76,7 +86,7 @@ def _get_token_linux() -> AuthResult:
     except FileNotFoundError:
         return AuthResult(
             access_token=None,
-            error="'secret-tool' not found. Install libsecret-tools.",
+            error="No Claude Code credentials found. Run Claude Code to log in.",
         )
 
 
