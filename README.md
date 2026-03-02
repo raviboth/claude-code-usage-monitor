@@ -4,6 +4,12 @@
 
 A lightweight desktop utility for macOS and Linux that displays your Claude Code usage limits in the system tray and a dashboard window.
 
+<p align="center">
+  <img src="assets/tray.png" alt="System tray icon" height="40">
+  &nbsp;&nbsp;
+  <img src="assets/dashboard.png" alt="Dashboard window" width="380">
+</p>
+
 ## Features
 
 - **System tray icon** showing your current 5-hour usage percentage as a color-coded ring (green/yellow/red)
