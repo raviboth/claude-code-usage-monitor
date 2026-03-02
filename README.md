@@ -145,6 +145,7 @@ src/
 ├── dashboard.py       # Main PyQt6 window with progress bars
 ├── charts.py          # Daily activity chart and insights panel
 ├── icons.py           # Dynamic tray icon rendering with Pillow
+├── utils.py           # Shared formatting and color utilities
 └── constants.py       # Configuration values
 
 scripts/
