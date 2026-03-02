@@ -21,6 +21,7 @@ class Signals(QObject):
 
     usage_updated = pyqtSignal(object)  # UsageData or None
     usage_error = pyqtSignal(str)
+    refresh_done = pyqtSignal()
 
 
 class App:
@@ -36,6 +37,7 @@ class App:
 
         self._signals = Signals()
         self._db = UsageDB()
+        self._db.prune_old()
         self._running = True
 
         # Notifications
@@ -45,9 +47,11 @@ class App:
         self._dashboard = DashboardWindow()
         self._dashboard.set_refresh_callback(self._on_refresh)
         self._dashboard.set_threshold_callback(self._on_threshold_changed)
+        self._dashboard.set_threshold_enabled_callback(self._on_threshold_enabled_changed)
         self._dashboard.set_reset_alerts_callback(self._on_reset_alerts_changed)
         self._dashboard.update_alert_settings(
             self._notifications.threshold,
+            self._notifications.threshold_enabled,
             self._notifications.reset_notifications,
         )
 
@@ -56,7 +60,7 @@ class App:
         self._insights = InsightsPanel()
 
         # Replace placeholders in dashboard layout
-        dash_layout = self._dashboard._layout
+        dash_layout = self._dashboard.get_layout()
         dash_layout.replaceWidget(self._dashboard.get_chart_placeholder(), self._chart)
         self._dashboard.get_chart_placeholder().deleteLater()
 
@@ -79,6 +83,7 @@ class App:
         # Signal connections
         self._signals.usage_updated.connect(self._handle_usage_update)
         self._signals.usage_error.connect(self._handle_usage_error)
+        self._signals.refresh_done.connect(self._on_refresh_done)
 
         # Status label timer -- update "X seconds ago" every 10s
         self._last_data: UsageData | None = None
@@ -104,9 +109,15 @@ class App:
         self._signals.usage_updated.emit(result.data)
 
     def _poll_loop(self) -> None:
+        consecutive_errors = 0
         while self._running:
             self._poll_once()
-            for _ in range(POLL_INTERVAL_SECONDS * 10):
+            if self._last_data is not None:
+                consecutive_errors = 0
+            else:
+                consecutive_errors = min(consecutive_errors + 1, 3)
+            wait = min(POLL_INTERVAL_SECONDS * (2 ** consecutive_errors), 300)
+            for _ in range(int(wait * 10)):
                 if not self._running:
                     return
                 time.sleep(0.1)
@@ -123,25 +134,45 @@ class App:
 
     def _refresh_status_time(self) -> None:
         if self._last_data:
-            self._dashboard.update_usage(self._last_data)
+            self._dashboard.update_status_time(self._last_data.fetched_at)
 
     def _on_open_dashboard(self, *_args) -> None:
+        stats = load_local_stats()
+        if stats:
+            self._chart.set_data(stats.daily_activity)
+            self._insights.set_stats(stats)
         self._dashboard.show()
         self._dashboard.raise_()
         self._dashboard.activateWindow()
 
     def _on_refresh(self, *_args) -> None:
-        threading.Thread(target=self._poll_once, daemon=True).start()
+        self._dashboard.set_refresh_enabled(False)
+
+        def _do_refresh() -> None:
+            self._poll_once()
+            self._signals.refresh_done.emit()
+
+        threading.Thread(target=_do_refresh, daemon=True).start()
+
+    def _on_refresh_done(self) -> None:
+        self._dashboard.set_refresh_enabled(True)
 
     def _on_quit(self, *_args) -> None:
         self._running = False
         self._tray.hide()
+        if hasattr(self, '_poll_thread'):
+            self._poll_thread.join(timeout=2.0)
         self._db.prune_old()
         self._db.close()
         self._qt_app.quit()
 
     def _on_threshold_changed(self, value: int) -> None:
         self._notifications.update_threshold(value / 100.0)
+
+    def _on_threshold_enabled_changed(self, state: int) -> None:
+        enabled = state != 0
+        self._notifications.set_threshold_enabled(enabled)
+        self._dashboard.set_threshold_spin_enabled(enabled)
 
     def _on_reset_alerts_changed(self, state: int) -> None:
         self._notifications.set_reset_notifications(state != 0)
@@ -151,8 +182,8 @@ class App:
         self._tray.show()
 
         # Start polling in background thread
-        poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
-        poll_thread.start()
+        self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._poll_thread.start()
 
         # Run Qt event loop on main thread (blocks until quit)
         sys.exit(self._qt_app.exec())

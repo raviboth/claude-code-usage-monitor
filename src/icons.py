@@ -1,3 +1,4 @@
+import functools
 import sys
 
 from PIL import Image, ImageDraw, ImageFont
@@ -10,6 +11,28 @@ _RENDER_SIZE = 44 if sys.platform == "darwin" else 48
 
 # Dark background color for the inner circle of the ring
 _BG_COLOR = "#1a1a1a"
+
+
+@functools.lru_cache(maxsize=4)
+def _load_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load a TrueType font at the given size, with caching.
+
+    Tries several well-known system font paths (macOS and Linux) and falls
+    back to the Pillow built-in bitmap font if none are available.
+    """
+    font_paths = [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/SFCompact.ttf",
+        "/System/Library/Fonts/SFNSMono.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    for path in font_paths:
+        try:
+            return ImageFont.truetype(path, font_size)
+        except (OSError, AttributeError):
+            continue
+    return ImageFont.load_default()
 
 
 def render_tray_icon(utilization: float | None) -> Image.Image:
@@ -47,22 +70,7 @@ def render_tray_icon(utilization: float | None) -> Image.Image:
     else:
         font_size = size * 32 // 100
 
-    font = None
-    font_paths = [
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/System/Library/Fonts/SFCompact.ttf",
-        "/System/Library/Fonts/SFNSMono.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ]
-    for path in font_paths:
-        try:
-            font = ImageFont.truetype(path, font_size)
-            break
-        except (OSError, AttributeError):
-            continue
-    if font is None:
-        font = ImageFont.load_default()
+    font = _load_font(font_size)
 
     bbox = draw.textbbox((0, 0), label, font=font)
     text_w = bbox[2] - bbox[0]

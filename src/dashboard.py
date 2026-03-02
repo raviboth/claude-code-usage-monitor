@@ -52,6 +52,10 @@ class UsageBar(QWidget):
         self._reset_label.setStyleSheet("font-size: 12px; color: #888;")
         layout.addWidget(self._reset_label)
 
+    def set_subtitle(self, text: str) -> None:
+        """Set the subtitle text below the progress bar."""
+        self._reset_label.setText(text)
+
     def update_data(self, window: UsageWindow) -> None:
         pct = min(int(window.utilization * 100), 100)
         self._bar.setValue(pct)
@@ -131,16 +135,20 @@ class DashboardWindow(QWidget):
         self._layout.addWidget(alerts_header)
 
         threshold_row = QHBoxLayout()
-        threshold_label = QLabel("5h usage alert at:")
-        threshold_label.setStyleSheet("font-size: 12px;")
-        threshold_row.addWidget(threshold_label)
+        self._threshold_check = QCheckBox("5h usage alert at:")
+        self._threshold_check.setStyleSheet("font-size: 12px;")
+        threshold_row.addWidget(self._threshold_check)
 
         self._threshold_spin = QSpinBox()
         self._threshold_spin.setRange(10, 100)
-        self._threshold_spin.setSuffix("%")
         self._threshold_spin.setValue(70)
-        self._threshold_spin.setFixedWidth(75)
+        self._threshold_spin.setFixedWidth(60)
         threshold_row.addWidget(self._threshold_spin)
+
+        pct_label = QLabel("%")
+        pct_label.setStyleSheet("font-size: 12px;")
+        threshold_row.addWidget(pct_label)
+
         threshold_row.addStretch()
         self._layout.addLayout(threshold_row)
 
@@ -164,19 +172,39 @@ class DashboardWindow(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
+    def get_layout(self) -> QVBoxLayout:
+        """Return the main content layout for widget replacement."""
+        return self._layout
+
     def set_refresh_callback(self, callback: Callable[[], None]) -> None:
         self._refresh_btn.clicked.connect(callback)
+
+    def set_refresh_enabled(self, enabled: bool) -> None:
+        self._refresh_btn.setEnabled(enabled)
 
     def set_threshold_callback(self, callback: Callable[[], None]) -> None:
         self._threshold_spin.valueChanged.connect(callback)
 
+    def set_threshold_enabled_callback(self, callback: Callable[[], None]) -> None:
+        self._threshold_check.stateChanged.connect(callback)
+
     def set_reset_alerts_callback(self, callback: Callable[[], None]) -> None:
         self._reset_check.stateChanged.connect(callback)
 
-    def update_alert_settings(self, threshold: float, reset_enabled: bool) -> None:
+    def set_threshold_spin_enabled(self, enabled: bool) -> None:
+        self._threshold_spin.setEnabled(enabled)
+
+    def update_alert_settings(
+        self, threshold: float, threshold_enabled: bool, reset_enabled: bool
+    ) -> None:
         self._threshold_spin.blockSignals(True)
         self._threshold_spin.setValue(int(threshold * 100))
         self._threshold_spin.blockSignals(False)
+
+        self._threshold_check.blockSignals(True)
+        self._threshold_check.setChecked(threshold_enabled)
+        self._threshold_spin.setEnabled(threshold_enabled)
+        self._threshold_check.blockSignals(False)
 
         self._reset_check.blockSignals(True)
         self._reset_check.setChecked(reset_enabled)
@@ -198,14 +226,18 @@ class DashboardWindow(QWidget):
                 resets_at=None,
             )
             self._extra_bar.update_data(extra_window)
-            self._extra_bar._reset_label.setText(
+            self._extra_bar.set_subtitle(
                 f"${data.extra_usage.used_credits:.2f} / ${data.extra_usage.monthly_limit:.2f} monthly"
             )
             self._extra_bar.setVisible(True)
         else:
             self._extra_bar.setVisible(False)
 
-        elapsed = (datetime.now(timezone.utc) - data.fetched_at).total_seconds()
+        self.update_status_time(data.fetched_at)
+
+    def update_status_time(self, fetched_at: datetime) -> None:
+        """Lightweight update of just the 'last updated' label."""
+        elapsed = (datetime.now(timezone.utc) - fetched_at).total_seconds()
         if elapsed < 60:
             self._status_label.setText(f"Last updated: {int(elapsed)} seconds ago")
         else:

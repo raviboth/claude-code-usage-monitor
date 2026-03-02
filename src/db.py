@@ -1,6 +1,7 @@
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
+from typing import Self
 
 from src.api import UsageData
 from src.constants import APP_DATA_DIR, DB_FILENAME, DB_PRUNE_DAYS
@@ -40,12 +41,26 @@ class UsageDB:
         if not db_path.exists():
             db_path.touch(mode=0o600)
         self._lock = threading.Lock()
-        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        self._conn: sqlite3.Connection | None = sqlite3.connect(
+            str(db_path), check_same_thread=False
+        )
         self._conn.execute(_CREATE_TABLE)
         self._conn.commit()
 
+    # -- context manager support ------------------------------------------
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    # -- public API -------------------------------------------------------
+
     def insert_snapshot(self, data: UsageData) -> None:
         with self._lock:
+            if self._conn is None:
+                return
             self._conn.execute(
                 _INSERT,
                 (
@@ -64,10 +79,15 @@ class UsageDB:
 
     def prune_old(self) -> None:
         with self._lock:
+            if self._conn is None:
+                return
             cutoff = datetime.now(timezone.utc) - timedelta(days=DB_PRUNE_DAYS)
             self._conn.execute(_PRUNE, (cutoff.isoformat(),))
             self._conn.commit()
 
     def close(self) -> None:
         with self._lock:
+            if self._conn is None:
+                return
             self._conn.close()
+            self._conn = None

@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.constants import COLOR_GREEN
 from src.local_stats import DailyActivity, LocalStats
 
 
@@ -96,7 +97,7 @@ class ActivityChart(QWidget):
                 values.append(d.tool_call_count)
 
         x = list(range(len(values)))
-        bar = pg.BarGraphItem(x=x, height=values, width=0.6, brush="#4CAF50")
+        bar = pg.BarGraphItem(x=x, height=values, width=0.6, brush=COLOR_GREEN)
         self._plot.addItem(bar)
         self._plot.enableAutoRange()
 
