@@ -54,6 +54,26 @@ pip install pyinstaller
 
 The built app will be at `dist/Claude Usage Monitor.app`. Copy it to `/Applications/` to install.
 
+### Standalone AppImage (Linux)
+
+Build a portable AppImage that doesn't require Python:
+
+```bash
+pip install pyinstaller
+./scripts/build-linux.sh
+```
+
+The built AppImage will be at `dist/Claude_Usage_Monitor-x86_64.AppImage`. Make it executable and run:
+
+```bash
+chmod +x dist/Claude_Usage_Monitor-x86_64.AppImage
+./dist/Claude_Usage_Monitor-x86_64.AppImage
+```
+
+### Pre-built Binaries
+
+Pre-built macOS `.app` and Linux `.AppImage` binaries are available on the [Releases](https://github.com/raviboth/claude-code-usage-monitor/releases) page.
+
 ## Usage
 
 ### Manual Start

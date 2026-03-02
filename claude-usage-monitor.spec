@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
 a = Analysis(
     ['src/main.py'],
@@ -43,14 +44,15 @@ coll = COLLECT(
     name='Claude Usage Monitor',
 )
 
-app = BUNDLE(
-    coll,
-    name='Claude Usage Monitor.app',
-    icon=None,
-    bundle_identifier='com.claude-usage-monitor',
-    info_plist={
-        'LSUIElement': True,
-        'CFBundleShortVersionString': '0.1.0',
-        'NSHighResolutionCapable': True,
-    },
-)
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='Claude Usage Monitor.app',
+        icon=None,
+        bundle_identifier='com.claude-usage-monitor',
+        info_plist={
+            'LSUIElement': True,
+            'CFBundleShortVersionString': '0.1.0',
+            'NSHighResolutionCapable': True,
+        },
+    )

@@ -1,0 +1,133 @@
+name: Build
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .app bundle
+        run: pyinstaller claude-usage-monitor.spec --noconfirm --clean
+
+      - name: Create zip archive
+        run: |
+          cd dist
+          zip -r "Claude_Usage_Monitor-macOS.zip" "Claude Usage Monitor.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: dist/Claude_Usage_Monitor-macOS.zip
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "dist/Claude_Usage_Monitor-macOS.zip"
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-cursor0 \
+            libxkbcommon0 \
+            libgl1 \
+            libegl1 \
+            libfuse2 \
+            fuse
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller claude-usage-monitor.spec --noconfirm --clean
+
+      - name: Generate icon
+        run: |
+          python3 -c "
+          from src.icons import create_icon
+          img = create_icon(50, 256)
+          img.save('claude-usage-monitor.png')
+          "
+
+      - name: Assemble AppDir
+        run: |
+          mkdir -p build/AppDir/usr/bin
+          mkdir -p build/AppDir/usr/share/applications
+          mkdir -p build/AppDir/usr/share/icons/hicolor/256x256/apps
+          cp -r "dist/Claude Usage Monitor/"* build/AppDir/usr/bin/
+          cp claude-usage-monitor.png build/AppDir/usr/share/icons/hicolor/256x256/apps/
+          cp claude-usage-monitor.png build/AppDir/
+
+      - name: Create desktop file and AppRun
+        run: |
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Claude Usage Monitor' \
+            'Exec=Claude Usage Monitor' \
+            'Icon=claude-usage-monitor' \
+            'Categories=Utility;Monitor;' \
+            'Comment=Monitor your Claude Code API usage limits' \
+            'Terminal=false' \
+            'StartupNotify=false' \
+            > build/AppDir/claude-usage-monitor.desktop
+          cp build/AppDir/claude-usage-monitor.desktop build/AppDir/usr/share/applications/
+
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'SELF="$(readlink -f "$0")"' \
+            'HERE="${SELF%/*}"' \
+            'export PATH="${HERE}/usr/bin:${PATH}"' \
+            'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"' \
+            'exec "${HERE}/usr/bin/Claude Usage Monitor" "$@"' \
+            > build/AppDir/AppRun
+          chmod +x build/AppDir/AppRun
+
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o build/appimagetool.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x build/appimagetool.AppImage
+
+      - name: Build AppImage
+        run: |
+          ARCH=x86_64 ./build/appimagetool.AppImage --appimage-extract-and-run build/AppDir dist/Claude_Usage_Monitor-x86_64.AppImage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: dist/Claude_Usage_Monitor-x86_64.AppImage
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "dist/Claude_Usage_Monitor-x86_64.AppImage"
