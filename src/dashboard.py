@@ -1,7 +1,7 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -16,55 +16,11 @@ from PyQt6.QtWidgets import (
 
 from src.api import UsageData, UsageWindow
 from src.constants import (
-    COLOR_GREEN,
-    COLOR_RED,
-    COLOR_YELLOW,
-    THRESHOLD_RED,
-    THRESHOLD_YELLOW,
     WINDOW_DEFAULT_HEIGHT,
     WINDOW_DEFAULT_WIDTH,
     WINDOW_TITLE,
 )
-
-
-def _color_for_util(util: float) -> str:
-    if util >= THRESHOLD_RED:
-        return COLOR_RED
-    if util >= THRESHOLD_YELLOW:
-        return COLOR_YELLOW
-    return COLOR_GREEN
-
-
-def _format_reset(resets_at: datetime | None) -> str:
-    if resets_at is None:
-        return "No reset scheduled"
-    now = datetime.now(timezone.utc)
-    delta = resets_at - now
-    if delta.total_seconds() <= 0:
-        return "Resetting now"
-
-    days = delta.days
-    hours, remainder = divmod(delta.seconds, 3600)
-    minutes = remainder // 60
-
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0:
-        parts.append(f"{hours}h")
-    if minutes > 0 and days == 0:
-        parts.append(f"{minutes}m")
-    relative = " ".join(parts) if parts else "soon"
-
-    local_reset = resets_at.astimezone()
-    if days == 0:
-        absolute = local_reset.strftime("%-I:%M %p today")
-    elif days < 7:
-        absolute = local_reset.strftime("%a at %-I:%M %p")
-    else:
-        absolute = local_reset.strftime("%b %-d at %-I:%M %p")
-
-    return f"Resets in {relative} \u00b7 {absolute}"
+from src.utils import color_for_utilization, format_reset_time_verbose
 
 
 class UsageBar(QWidget):
@@ -106,7 +62,7 @@ class UsageBar(QWidget):
         else:
             self._pct_label.setText(f"{display_pct}%")
 
-        color = _color_for_util(window.utilization)
+        color = color_for_utilization(window.utilization)
         self._bar.setStyleSheet(
             f"""
             QProgressBar {{
@@ -123,7 +79,7 @@ class UsageBar(QWidget):
         self._pct_label.setStyleSheet(
             f"font-size: 14px; font-weight: bold; min-width: 45px; color: {color};"
         )
-        self._reset_label.setText(_format_reset(window.resets_at))
+        self._reset_label.setText(format_reset_time_verbose(window.resets_at))
 
 
 class DashboardWindow(QWidget):
@@ -208,13 +164,13 @@ class DashboardWindow(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
-    def set_refresh_callback(self, callback: callable) -> None:
+    def set_refresh_callback(self, callback: Callable[[], None]) -> None:
         self._refresh_btn.clicked.connect(callback)
 
-    def set_threshold_callback(self, callback: callable) -> None:
+    def set_threshold_callback(self, callback: Callable[[], None]) -> None:
         self._threshold_spin.valueChanged.connect(callback)
 
-    def set_reset_alerts_callback(self, callback: callable) -> None:
+    def set_reset_alerts_callback(self, callback: Callable[[], None]) -> None:
         self._reset_check.stateChanged.connect(callback)
 
     def update_alert_settings(self, threshold: float, reset_enabled: bool) -> None:
@@ -237,7 +193,6 @@ class DashboardWindow(QWidget):
             self._opus_bar.setVisible(False)
 
         if data.extra_usage and data.extra_usage.is_enabled:
-            from src.api import UsageWindow
             extra_window = UsageWindow(
                 utilization=data.extra_usage.utilization,
                 resets_at=None,

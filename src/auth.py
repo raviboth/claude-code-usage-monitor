@@ -3,6 +3,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+from src.constants import KEYCHAIN_SERVICE_NAME
+
 
 @dataclass
 class AuthResult:
@@ -29,7 +31,7 @@ def _get_token_macos() -> AuthResult:
                 "security",
                 "find-generic-password",
                 "-s",
-                "Claude Code-credentials",
+                KEYCHAIN_SERVICE_NAME,
                 "-w",
             ],
             capture_output=True,
@@ -57,7 +59,7 @@ def _get_token_linux() -> AuthResult:
                 "secret-tool",
                 "lookup",
                 "service",
-                "Claude Code-credentials",
+                KEYCHAIN_SERVICE_NAME,
             ],
             capture_output=True,
             text=True,

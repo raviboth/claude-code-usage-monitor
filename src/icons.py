@@ -2,14 +2,7 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-from src.constants import (
-    COLOR_GREEN,
-    COLOR_GREY,
-    COLOR_RED,
-    COLOR_YELLOW,
-    THRESHOLD_RED,
-    THRESHOLD_YELLOW,
-)
+from src.utils import color_for_utilization, format_utilization_label
 
 # macOS menu bar icons should be 22pt, rendered at 2x for Retina = 44px
 # Linux icons are typically 24px
@@ -17,25 +10,6 @@ _RENDER_SIZE = 44 if sys.platform == "darwin" else 48
 
 # Dark background color for the inner circle of the ring
 _BG_COLOR = "#1a1a1a"
-
-
-def _color_for_utilization(utilization: float | None) -> str:
-    if utilization is None:
-        return COLOR_GREY
-    if utilization >= THRESHOLD_RED:
-        return COLOR_RED
-    if utilization >= THRESHOLD_YELLOW:
-        return COLOR_YELLOW
-    return COLOR_GREEN
-
-
-def _label_for_utilization(utilization: float | None) -> str:
-    if utilization is None:
-        return "?"
-    pct = int(utilization * 100)
-    if pct > 100:
-        return "100+"
-    return str(pct)
 
 
 def render_tray_icon(utilization: float | None) -> Image.Image:
@@ -49,7 +23,7 @@ def render_tray_icon(utilization: float | None) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    color = _color_for_utilization(utilization)
+    color = color_for_utilization(utilization)
 
     # Draw outer colored circle (the ring)
     draw.ellipse([1, 1, size - 2, size - 2], fill=color)
@@ -63,7 +37,7 @@ def render_tray_icon(utilization: float | None) -> Image.Image:
         fill=_BG_COLOR,
     )
 
-    label = _label_for_utilization(utilization)
+    label = format_utilization_label(utilization)
 
     # Font size proportional to icon, smaller for longer text
     if len(label) <= 2:

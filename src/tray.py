@@ -1,39 +1,13 @@
-from datetime import datetime, timezone
+from collections.abc import Callable
 from io import BytesIO
 
 from PIL import Image as PILImage
-from PyQt6.QtGui import QAction, QIcon, QImage, QPixmap
+from PyQt6.QtGui import QIcon, QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 from src.api import UsageData
 from src.icons import render_tray_icon
-
-
-def _format_reset_time(resets_at: datetime | None) -> str:
-    if resets_at is None:
-        return "no reset scheduled"
-    now = datetime.now(timezone.utc)
-    delta = resets_at - now
-    if delta.total_seconds() <= 0:
-        return "resetting now"
-    days = delta.days
-    hours, remainder = divmod(delta.seconds, 3600)
-    minutes = remainder // 60
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0:
-        parts.append(f"{hours}h")
-    if minutes > 0 and days == 0:
-        parts.append(f"{minutes}m")
-    return f"resets in {' '.join(parts)}" if parts else "resets soon"
-
-
-def _format_utilization(util: float) -> str:
-    pct = int(util * 100)
-    if pct > 100:
-        return "100+%"
-    return f"{pct}%"
+from src.utils import format_reset_time, format_utilization
 
 
 def _pil_to_qicon(pil_image: PILImage.Image) -> QIcon:
@@ -51,9 +25,9 @@ def _pil_to_qicon(pil_image: PILImage.Image) -> QIcon:
 class TrayManager:
     def __init__(
         self,
-        on_open_dashboard: callable,
-        on_refresh: callable,
-        on_quit: callable,
+        on_open_dashboard: Callable[[], None],
+        on_refresh: Callable[[], None],
+        on_quit: Callable[[], None],
     ) -> None:
         self._on_open_dashboard = on_open_dashboard
         self._on_refresh = on_refresh
@@ -80,21 +54,21 @@ class TrayManager:
             stale_suffix = " (stale)" if self._stale else ""
             d = self._last_data
 
-            five_h = f"5h: {_format_utilization(d.five_hour.utilization)} \u00b7 {_format_reset_time(d.five_hour.resets_at)}{stale_suffix}"
+            five_h = f"5h: {format_utilization(d.five_hour.utilization)} \u00b7 {format_reset_time(d.five_hour.resets_at)}{stale_suffix}"
             action = self._menu.addAction(five_h)
             action.setEnabled(False)
 
-            seven_d = f"7d: {_format_utilization(d.seven_day.utilization)} \u00b7 {_format_reset_time(d.seven_day.resets_at)}{stale_suffix}"
+            seven_d = f"7d: {format_utilization(d.seven_day.utilization)} \u00b7 {format_reset_time(d.seven_day.resets_at)}{stale_suffix}"
             action = self._menu.addAction(seven_d)
             action.setEnabled(False)
 
             if d.seven_day_opus:
-                opus = f"Opus 7d: {_format_utilization(d.seven_day_opus.utilization)} \u00b7 {_format_reset_time(d.seven_day_opus.resets_at)}{stale_suffix}"
+                opus = f"Opus 7d: {format_utilization(d.seven_day_opus.utilization)} \u00b7 {format_reset_time(d.seven_day_opus.resets_at)}{stale_suffix}"
                 action = self._menu.addAction(opus)
                 action.setEnabled(False)
 
             if d.extra_usage and d.extra_usage.is_enabled:
-                extra = f"Extra: ${d.extra_usage.used_credits:.2f}/${d.extra_usage.monthly_limit:.2f} ({_format_utilization(d.extra_usage.utilization)}){stale_suffix}"
+                extra = f"Extra: ${d.extra_usage.used_credits:.2f}/${d.extra_usage.monthly_limit:.2f} ({format_utilization(d.extra_usage.utilization)}){stale_suffix}"
                 action = self._menu.addAction(extra)
                 action.setEnabled(False)
         else:

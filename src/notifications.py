@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from pathlib import Path
 
 from plyer import notification
 
@@ -11,8 +10,6 @@ SETTINGS_FILE = APP_DATA_DIR / "settings.json"
 
 DEFAULT_THRESHOLD = 0.70
 DEFAULT_RESET_NOTIFICATIONS = False
-
-THRESHOLD_CYCLE = [0.50, 0.60, 0.70, 0.80, 0.90]
 
 
 class NotificationManager:

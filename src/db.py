@@ -1,7 +1,6 @@
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from src.api import UsageData
 from src.constants import APP_DATA_DIR, DB_FILENAME, DB_PRUNE_DAYS
@@ -31,13 +30,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 _PRUNE = """
 DELETE FROM usage_snapshots WHERE timestamp < ?;
-"""
-
-_SELECT_RECENT = """
-SELECT timestamp, five_hour_util, seven_day_util, seven_day_opus_util
-FROM usage_snapshots
-WHERE timestamp >= ?
-ORDER BY timestamp ASC;
 """
 
 
@@ -75,20 +67,6 @@ class UsageDB:
             cutoff = datetime.now(timezone.utc) - timedelta(days=DB_PRUNE_DAYS)
             self._conn.execute(_PRUNE, (cutoff.isoformat(),))
             self._conn.commit()
-
-    def get_recent(self, days: int = 7) -> list[dict]:
-        with self._lock:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-            rows = self._conn.execute(_SELECT_RECENT, (cutoff.isoformat(),)).fetchall()
-        return [
-            {
-                "timestamp": row[0],
-                "five_hour_util": row[1],
-                "seven_day_util": row[2],
-                "seven_day_opus_util": row[3],
-            }
-            for row in rows
-        ]
 
     def close(self) -> None:
         with self._lock:
